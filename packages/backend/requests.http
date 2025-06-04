@@ -4,7 +4,7 @@ Accept: application/json
 
 ###
 
-### 2) Rename one image (replace <IMAGE_ID> with a real ObjectId)
+### 2) Rename one image
 PATCH http://localhost:3000/api/images/683b9c09cb0caa585d62724d
 src
 Content-Type: application/json
