@@ -1,25 +1,61 @@
-// src/App.tsx
+import { useEffect, useState } from "react";
 import { Routes, Route } from "react-router";
-import { useState } from "react";
+import { ValidRoutes } from "csc437-monorepo-backend/src/common/ValidRoutes.ts";
+import type { IApiImageData } from "csc437-monorepo-backend/src/common/ApiImageData";
 
-import { MainLayout }   from "./MainLayout.tsx";
-import { AllImages }    from "./images/AllImages.tsx";
-import { ImageDetails } from "./images/ImageDetails.tsx";
-import { UploadPage }   from "./UploadPage.tsx";
-import { LoginPage }    from "./LoginPage.tsx";
-import { fetchDataFromServer } from "./MockAppData.ts";
+import { AllImages } from "./images/AllImages";
+import { ImageDetails } from "./images/ImageDetails";
+import { LoginPage } from "./LoginPage";
+import { MainLayout } from "./MainLayout";
 
 export default function App() {
-  const [images] = useState(fetchDataFromServer);
+  /*  state that *persists* while user navigates */
+  const [images, setImages]   = useState<IApiImageData[]>([]);
+  const [isLoading, setLoad]  = useState(true);
+  const [hasError, setError]  = useState(false);
+
+  /* fetch once on mount */
+  useEffect(() => {
+    fetch("/api/images")
+      .then(r => {
+        if (!r.ok) throw new Error(`bad status ${r.status}`);
+        return r.json() as Promise<IApiImageData[]>;
+      })
+      .then(data => setImages(data))
+      .catch(() => setError(true))
+      .finally(() => setLoad(false));
+  }, []);
+
+  function handleNameSaved(id: string, newName: string) {
+    setImages(prev =>
+      prev.map(img => (img.id === id ? { ...img, name: newName } : img))
+    );
+  }
 
   return (
     <Routes>
-      <Route path="/" element={<MainLayout />}>
-        <Route index        element={<AllImages    images={images} />} />
-        <Route path="upload" element={<UploadPage            />}   />
-        <Route path="login"  element={<LoginPage             />}   />
-        <Route path="images/:id"
-               element={<ImageDetails images={images} />} />
+      <Route element={<MainLayout />}> {/* nested layout keeps header alive */}
+        <Route
+          path={ValidRoutes.HOME}
+          element={
+            <AllImages images={images} isLoading={isLoading} hasError={hasError} />
+          }
+        />
+        <Route
+          path={ValidRoutes.LOGIN}
+          element={<LoginPage />}
+        />
+        <Route
+          path={`${ValidRoutes.IMAGES_LIST}/:imageId`}
+          element={
+            <ImageDetails
+              images={images}
+              isLoading={isLoading}
+              hasError={hasError}
+              onNameSaved={handleNameSaved}   
+            />
+          }
+        />
       </Route>
     </Routes>
   );

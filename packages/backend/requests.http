@@ -1,0 +1,59 @@
+### 1) Fetch all images (before rename)
+GET http://localhost:3000/api/images
+Accept: application/json
+
+###
+
+### 2) Rename one image (replace <IMAGE_ID> with a real ObjectId)
+PATCH http://localhost:3000/api/images/683b9c09cb0caa585d62724d
+src
+Content-Type: application/json
+
+{ "name": "Dramatic New Title" }
+
+###
+
+### 3) Fetch all images (after rename)
+GET http://localhost:3000/api/images
+Accept: application/json
+
+###
+###
+
+### Rename an image (valid id / valid name)
+PATCH http://localhost:3000/api/images/683b9c09cb0caa585d62724d
+Content-Type: application/json
+
+{ "name": "New Title for Blue Merle" }
+
+###
+
+### Malformed body → 400 Bad Request
+PATCH http://localhost:3000/api/images/683b9c09cb0caa585d62724d
+Content-Type: application/json
+
+{ "wrongField": "nope" }
+
+###
+
+### Name too long → 422 Unprocessable Entity
+PATCH http://localhost:3000/api/images/683b9c09cb0caa585d62724d
+Content-Type: application/json
+
+{ "name": "x".repeat(101) }
+
+###
+
+### Invalid ObjectId format → 500 Internal Server Error
+PATCH http://localhost:3000/api/images/notAValidId123
+Content-Type: application/json
+
+{ "name": "Won’t Work" }
+
+###
+
+### Non‐existent but well‐formed ObjectId → 404 Not Found
+PATCH http://localhost:3000/api/images/aaaaaaaaaaaaaaaaaaaaaaaa
+Content-Type: application/json
+
+{ "name": "Still Not Found" }
