@@ -1,3 +1,4 @@
+// src/components/ImageNameEditor.tsx
 import { useState } from "react";
 
 interface INameEditorProps {
@@ -8,25 +9,32 @@ interface INameEditorProps {
 }
 
 export function ImageNameEditor(props: INameEditorProps) {
-  const [isEditing,   setEdit]  = useState(false);
-  const [input,       setInput] = useState(props.initialValue);
-  const [isWorking,   setWork]  = useState(false);
-  const [hasError,    setErr ]  = useState(false);
+  const [isEditing, setEdit] = useState(false);
+  const [input, setInput] = useState(props.initialValue);
+  const [isWorking, setWork] = useState(false);
+  const [hasError, setErr] = useState(false);
 
   async function handleSubmitPressed() {
     setWork(true);
     setErr(false);
 
     try {
-      /* dummy round-trip to the server – it purposely returns the
-         *same* image array; a real API would PATCH /api/images/:id */
-      const res = await fetch("/api/images");
-      if (!res.ok) throw new Error("bad status");
+      const response = await fetch(`/api/images/${props.imageId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: input }),
+      });
 
-      /* everything ‘ok’ - update global state through the callback */
+      // Lab 22: on success, the server now returns 204 No Content.
+      if (!response.ok) {
+        // any 4xx/5xx => show error
+        throw new Error(`Server returned ${response.status}`);
+      }
+
+      // (1) update global state via the callback
       props.onNameSaved(props.imageId, input);
 
-      /* close editor */
+      // (2) close the editor UI
       setEdit(false);
     } catch (err) {
       console.error(err);
@@ -44,7 +52,7 @@ export function ImageNameEditor(props: INameEditorProps) {
           New&nbsp;Name{" "}
           <input
             value={input}
-            onChange={e => setInput(e.target.value)}
+            onChange={(e) => setInput(e.target.value)}
             disabled={isWorking}
           />
         </label>{" "}
@@ -58,7 +66,7 @@ export function ImageNameEditor(props: INameEditorProps) {
           Cancel
         </button>
         {isWorking && <p>Working…</p>}
-        {hasError  && <p style={{ color: "red" }}>Network error.</p>}
+        {hasError && <p style={{ color: "red" }}>Network error.</p>}
       </div>
     );
   }
