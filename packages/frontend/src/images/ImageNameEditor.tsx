@@ -25,19 +25,14 @@ export function ImageNameEditor(props: INameEditorProps) {
         body: JSON.stringify({ name: input }),
       });
 
-      // Lab 22: on success, the server now returns 204 No Content.
-      if (!response.ok) {
-        // any 4xx/5xx => show error
-        throw new Error(`Server returned ${response.status}`);
+      if (response.status === 204 || response.ok) {
+        props.onNameSaved(props.imageId, input);
+        setEdit(false);
+      } else {
+        throw new Error(`HTTP ${response.status}`);
       }
-
-      // (1) update global state via the callback
-      props.onNameSaved(props.imageId, input);
-
-      // (2) close the editor UI
-      setEdit(false);
     } catch (err) {
-      console.error(err);
+      console.error("Failed to PATCH /api/images/:id:", err);
       setErr(true);
     } finally {
       setWork(false);
