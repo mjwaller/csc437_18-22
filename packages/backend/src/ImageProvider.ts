@@ -3,7 +3,7 @@ import { Collection, MongoClient, ObjectId } from "mongodb";
 import type { IApiImageData } from "./common/ApiImageData.js";
 
 interface IImageDocument {
-  _id:      ObjectId;   // Mongo’s ObjectId
+  _id:      ObjectId;
   src:      string;
   name:     string;
   authorId: string; 
@@ -13,7 +13,6 @@ interface IUserDocument {
   _id:      string; 
   username: string;
   email: string
-  // (you can also include email, etc., if you like)
 }
 
 export class ImageProvider {
@@ -36,38 +35,44 @@ export class ImageProvider {
   /** 
    * Returns an array of IApiImageData, with author denormalized into { id, username } 
    */
-  async getAllImages(): Promise<IApiImageData[]> {
-    const pipeline = [
-      // 1) Look up user by matching authorId -> user._id
+  async getAllImages(searchTerm?: string): Promise<IApiImageData[]> {
+    const pipeline: object[] = [];
+  
+    if (searchTerm) {
+      pipeline.push({
+        $match: {
+          name: { $regex: searchTerm, $options: "i" }
+        }
+      });
+    }
+  
+    pipeline.push(
       {
         $lookup: {
           from:       this.usersCol.collectionName,
           localField: "authorId",
-          foreignField: "_id",      // <– changed from "id" to "_id"
+          foreignField:"id",
           as:         "authorArr"
         }
       },
-      // 2) Flatten the array (there should be exactly one match per document)
       { $unwind: "$authorArr" },
-
-      // 3) Project exactly the fields we want in our API:
       {
         $project: {
-          _id: 0,
-          // Convert the image’s ObjectId to a string and call it "id"
-          id:   { $toString: "$_id" },
-          name: 1,
-          src:  1,
+          // Convert MongoDB's _id ObjectId into a string _id
+          _id:    { $toString: "$_id" },
+          name:   1,
+          src:    1,
           author: {
-            id:       "$authorArr._id",      // user’s _id is already a string
+            id:       "$authorArr.id",
             username: "$authorArr.username"
           }
         }
       }
-    ];
-
+    );
+  
     return this.imagesCol.aggregate<IApiImageData>(pipeline).toArray();
   }
+  
 
   /**
    * (Later, when you build a search feature:)
@@ -125,4 +130,20 @@ export class ImageProvider {
 
     return result.matchedCount;
   }
+
+  async findImageByObjectId(objectId: ObjectId): Promise<IImageDocument | null> {
+    return this.imagesCol.findOne({ _id: objectId });
+  }
+  
+  async createImage(filename: string, name: string, authorUsername: string) {
+    const newDoc: IImageDocument = {
+      _id: new ObjectId(),
+      name,
+      src: `/uploads/${filename}`,
+      authorId: authorUsername,
+    };
+    await this.imagesCol.insertOne(newDoc);
+  }
+  
+
 }

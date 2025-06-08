@@ -1,5 +1,5 @@
 // src/images/ImageDetails.tsx
-import { useParams } from "react-router";
+import { useParams } from "react-router-dom";
 import { ImageNameEditor } from "./ImageNameEditor";
 import type { IApiImageData } from "csc437-monorepo-backend/src/common/ApiImageData.ts";
 
@@ -13,8 +13,8 @@ export interface ImageDetailsProps {
 export function ImageDetails(props: ImageDetailsProps) {
     const {images} = props;
   
-    const { imageId } = useParams();           // already importing from react-router
-    const image = images.find(img => img.id === imageId);
+    const { imageId } = useParams();
+    const image = images.find(img => img._id === imageId);
   
     /* loading & error handling identical to before … */
   
@@ -25,9 +25,8 @@ export function ImageDetails(props: ImageDetailsProps) {
         <h2>{image.name}</h2>
         <p>By {image.author.username}</p>
   
-        {/* ⬇️ newly inserted editor */}
         <ImageNameEditor
-          imageId={image.id}
+          imageId={image._id}
           initialValue={image.name}
           onNameSaved={props.onNameSaved}
         />

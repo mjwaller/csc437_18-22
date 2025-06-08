@@ -1,119 +1,99 @@
-// frontend/src/App.tsx
-import { useEffect, useState, useRef } from "react";
-import { Routes, Route } from "react-router";
+// src/App.tsx
+import { useState } from "react";
+import { Routes, Route } from "react-router-dom"; // <-- from react-router-dom
 
 import { MainLayout } from "./MainLayout";
 import { AllImages } from "./images/AllImages";
 import { ImageDetails } from "./images/ImageDetails";
 import { LoginPage } from "./LoginPage";
-import { ImageSearchForm } from "./images/ImageSearchForm";
+import { ProtectedRoute } from "./ProtectedRoute";
 
 import type { IApiImageData } from "csc437-monorepo-backend/src/common/ApiImageData";
-import { ValidRoutes } from "csc437-monorepo-backend/src/common/ValidRoutes";
+import { UploadPage } from "./UploadPage";
 
 export default function App() {
+  const [images, setImages] = useState<IApiImageData[]>([]);
+  const [isLoading] = useState(true);
+  const [hasError] = useState(false);
+  const [authToken, setAuthToken] = useState<string | null>(null);
 
-  const [images, setImages]   = useState<IApiImageData[]>([]);
-  const [isLoading, setLoad]  = useState<boolean>(true);
-  const [hasError,  setError] = useState<boolean>(false);
-
-  // (b) search box text
-  const [searchString, setSearchString] = useState<string>("");
-
-
-  const latestRequestNumberRef = useRef<number>(0);
-
-
-  function fetchImages(search?: string) {
-
-    latestRequestNumberRef.current += 1;
-    const thisRequestNumber = latestRequestNumberRef.current;
-
-
-    setLoad(true);
-    setError(false);
-
-    const url = search && search.trim().length > 0
-      ? `/api/images?search=${encodeURIComponent(search.trim())}`
-      : `/api/images`;
-
-    fetch(url)
-      .then(r => {
-        if (!r.ok) throw new Error(`bad status ${r.status}`);
-        return r.json() as Promise<IApiImageData[]>;
-      })
-      .then(data => {
-        if (thisRequestNumber === latestRequestNumberRef.current) {
-          setImages(data);
-        }
-      })
-      .catch(() => {
-        if (thisRequestNumber === latestRequestNumberRef.current) {
-          setError(true);
-        }
-      })
-      .finally(() => {
-        if (thisRequestNumber === latestRequestNumberRef.current) {
-          setLoad(false);
-        }
-      });
-  }
-
-  useEffect(() => {
-    fetchImages(); // fetch all images once
-  }, []);
-
-
-  function handleImageSearch() {
-    // trigger a new fetch with the current searchString
-    fetchImages(searchString);
-  }
-
-  function handleNameSaved(id: string, newName: string) {
-    // Let’s update our local “images” array immediately (optimistic UI).
-    setImages(prev =>
-      prev.map(img => (img.id === id ? { ...img, name: newName } : img))
-    );
+  function handleLoginSuccess(token: string) {
+    setAuthToken(token);
+    // …later, trigger fetch("/api/images") with Authorization header…
   }
 
   return (
     <Routes>
       <Route element={<MainLayout />}>
         <Route
-          path={ValidRoutes.HOME}
+          path="/login"
           element={
-            <AllImages
-              images={images}
-              isLoading={isLoading}
-              hasError={hasError}
-              // Pass <ImageSearchForm …/> as the “searchPanel” prop:
-              searchPanel={
-                <ImageSearchForm
-                  searchString={searchString}
-                  onSearchStringChange={setSearchString}
-                  onSearchRequested={handleImageSearch}
-                />
-              }
+            <LoginPage
+              isRegistering={false}
+              onLoginSuccess={handleLoginSuccess}
+            />
+          }
+        />
+        <Route
+          path="/register"
+          element={
+            <LoginPage
+              isRegistering={true}
+              onLoginSuccess={handleLoginSuccess}
             />
           }
         />
 
         <Route
-          path={ValidRoutes.LOGIN}
-          element={<LoginPage />}
+          path="/"
+          element={
+            <ProtectedRoute authToken={authToken}>
+              <AllImages
+                images={images}
+                isLoading={isLoading}
+                hasError={hasError}
+              />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/images/:imageId"
+          element={
+            <ProtectedRoute authToken={authToken}>
+              <ImageDetails
+                images={images}
+                isLoading={isLoading}
+                hasError={hasError}
+                onNameSaved={(id, newName) => {
+                  setImages((prev) =>
+                    prev.map((img) =>
+                      img._id === id ? { ...img, name: newName } : img
+                    )
+                  );
+                }}
+              />
+            </ProtectedRoute>
+          }
         />
 
         <Route
-          path={`${ValidRoutes.IMAGES_LIST}/:imageId`}
+          path="*"
           element={
-            <ImageDetails
-              images={images}
-              isLoading={isLoading}
-              hasError={hasError}
-              onNameSaved={handleNameSaved}
+            <LoginPage
+              isRegistering={false}
+              onLoginSuccess={handleLoginSuccess}
             />
           }
         />
+
+        <Route
+          path="/upload"
+          element={
+            <ProtectedRoute authToken={authToken}>
+              <UploadPage authToken={authToken!} />
+            </ProtectedRoute>
+          }
+          />
       </Route>
     </Routes>
   );

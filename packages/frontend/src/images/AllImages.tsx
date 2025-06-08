@@ -1,31 +1,26 @@
-// frontend/src/images/AllImages.tsx
-
+// src/images/AllImages.tsx
 import type { IApiImageData } from "csc437-monorepo-backend/src/common/ApiImageData";
 import { ImageGrid } from "./ImageGrid";
-import React from "react";
 
 export interface AllImagesProps {
   images: IApiImageData[];
   isLoading: boolean;
   hasError: boolean;
+  /** The JSX form (typically <ImageSearchForm … />) passed from App. */
   searchPanel?: React.ReactNode;
 }
 
 export function AllImages(props: AllImagesProps) {
-  const { images, isLoading, hasError, searchPanel } = props;
-
-  if (isLoading) {
-    return <p>Loading images…</p>;
-  }
-  if (hasError) {
-    return <p style={{ color: "red" }}>Error loading images.</p>;
-  }
+  if (props.isLoading) return <p>Loading images…</p>;
+  if (props.hasError) return <p style={{ color: "red" }}>Error loading images.</p>;
 
   return (
     <div>
-      {searchPanel}
+      {/** First render the search panel, if any */}
+      {props.searchPanel && <div style={{ marginBottom: "1em" }}>{props.searchPanel}</div>}
 
-      <ImageGrid images={images} />
+      {/** Then render the grid of images */}
+      <ImageGrid images={props.images} />
     </div>
   );
 }

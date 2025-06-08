@@ -1,68 +1,44 @@
-import express, { Request, Response } from "express";
+import express, { Request, Response, NextFunction } from "express";
 import { ImageProvider } from "../ImageProvider";
+import { imageMiddlewareFactory, handleImageFileErrors } from "../middleware/imageUploadMiddleware";
+import { verifyAuthToken } from "../middleware/verifyAuthToken";
 
 export function registerImageRoutes(app: express.Application, imageProvider: ImageProvider) {
   const router = express.Router();
 
-  // 1) GET /api/images?search=…
-  router.get("/", async (req: Request, res: Response) => {
-    const rawSearch = req.query.search;
-    let searchTerm: string | undefined;
-    if (typeof rawSearch === "string" && rawSearch.trim().length > 0) {
-      searchTerm = rawSearch.trim();
-    }
+  // … your existing GET and PATCH handlers …
 
-    try {
-      const images = await imageProvider.getImages(searchTerm);
-      res.json(images);
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: "Unable to fetch images" });
-    }
-  });
-
-  // 2) PATCH /api/images/:id
-  router.patch(
-    "/:id",
-    express.json(),
-    async (req: Request, res: Response) => {
-      const imageId = req.params.id;
-      const newName = req.body.name;
-
-      if (typeof newName !== "string") {
-        res.status(400).json({
-          error: "Bad Request",
-          message: "Request body must have a string 'name' field",
-        });
-        return;
-      }
-
-      const MAX_NAME_LENGTH = 100;
-      if (newName.length > MAX_NAME_LENGTH) {
-        res.status(422).json({
-          error: "Unprocessable Entity",
-          message: `Image name exceeds ${MAX_NAME_LENGTH} characters.`,
-        });
-        return;
-      }
-
+  // 3) File‐upload endpoint
+  router.post(
+    "/",
+    imageMiddlewareFactory.single("image"),
+    async (req: Request, res: Response, next: NextFunction): Promise<void> => {
       try {
-        const matchedCount = await imageProvider.updateImageName(imageId, newName);
-        if (matchedCount === 0) {
-          // either the id wasn’t a valid ObjectId or no document matched
-          res.status(404).json({
-            error: "Not Found",
-            message: "Image does not exist",
-          });
-          return;
+        if (!req.file || typeof req.body.name !== "string") {
+          res
+            .status(400)
+            .json({ error: "Bad Request", message: "Must include file + name" });
+          return;              // ← void return here
         }
-        res.status(204).send(); 
+  
+        const filename = req.file.filename;
+        const name     = req.body.name;
+        const author   = req.user!.username;
+  
+        await imageProvider.createImage(filename, name, author);
+  
+        res.status(201).end(); // ← still returns a Response, but *we don’t return it*
+        return;                // ← now this handler returns void
       } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: "Internal Server Error" });
+        next(err);             // ← returns void
       }
     }
   );
+  
 
-  app.use("/api/images", router);
+  // **mount the multer/MIME‐error handler** here
+  router.use(handleImageFileErrors);
+
+  // mount under /api/images and protect with JWT
+  app.use("/api/images", verifyAuthToken, router);
 }
