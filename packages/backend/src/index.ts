@@ -14,12 +14,16 @@ import { verifyAuthToken } from "./middleware/verifyAuthToken";
 dotenv.config();
 
 const app = express();
+app.use(express.json());
+
 const PORT = process.env.PORT || 3000;
 
 const STATIC_DIR  = process.env.STATIC_DIR || "public";
 const STATIC_PATH = path.resolve(process.cwd(), STATIC_DIR);
 const INDEX_HTML  = path.join(STATIC_PATH, "index.html");
 app.use(express.static(STATIC_DIR));
+
+app.use("/uploads", express.static(process.env.IMAGE_UPLOAD_DIR!));
 
 const mongoClient   = connectMongo();
 const imageProvider = new ImageProvider(mongoClient);

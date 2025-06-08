@@ -13,7 +13,7 @@ export interface ImageDetailsProps {
 export function ImageDetails(props: ImageDetailsProps) {
     const {images} = props;
   
-    const { imageId } = useParams();
+    const { imageId } = useParams<{imageId: string}>();
     const image = images.find(img => img._id === imageId);
   
     /* loading & error handling identical to before … */

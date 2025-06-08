@@ -3,69 +3,69 @@
 import { Collection, MongoClient } from "mongodb";
 import bcrypt from "bcrypt";
 
-interface ICredDocument {
-  /** We store the username as _id (so lookups are fast). */
-  _id: string;
-  username: string;
-  /** This field will be the bcrypt‐generated hash (which already includes the salt). */
-  password: string;
-}
+interface IUserCreds {
+    _id: string;         // username as the document _id
+    username: string;
+    password: string;    // salted+hashed
+  }
+  
+  interface IUserProfile {
+    _id: string;         // same as username
+    username: string;
+    email: string;
+  }
 
 export class CredentialsProvider {
-  private col: Collection<ICredDocument>;
+    private credsCol: Collection<IUserCreds>;
+    private usersCol: Collection<IUserProfile>;
 
-  constructor(mongoClient: MongoClient) {
-    const dbName = process.env.DB_NAME;
-    if (!dbName) {
-      throw new Error("Missing DB_NAME in .env");
-    }
-    const db = mongoClient.db(dbName);
+    constructor(private readonly mongoClient: MongoClient) {
+        const db = this.mongoClient.db(process.env.DB_NAME);
+        const credsName = process.env.CREDS_COLLECTION_NAME!;
+        const usersName = process.env.USERS_COLLECTION_NAME!;
+    
+        this.credsCol = db.collection<IUserCreds>(credsName);
+        this.usersCol = db.collection<IUserProfile>(usersName);
+      }
 
-    const credsColName = process.env.CREDS_COLLECTION_NAME;
-    if (!credsColName) {
-      throw new Error("Missing CREDS_COLLECTION_NAME in .env");
-    }
-    this.col = db.collection<ICredDocument>(credsColName);
-  }
-
-  /**
-   * Attempts to register a new user with the given username & plaintext password.
-   * Returns false if the username is already taken; otherwise, salts+hashes the password,
-   * inserts a document, and returns true.
-   */
-  async registerUser(username: string, password: string): Promise<boolean> {
-    // 1) Check if username already exists
-    const existing = await this.col.findOne({ _id: username });
-    if (existing) {
-      return false;
-    }
-
-    // 2) Generate a salt (bcrypt.genSalt(10)) and hash(password, salt)
-    const salt = await bcrypt.genSalt(10);
-    const hashed = await bcrypt.hash(password, salt);
-
-    // 3) Insert into collection: { _id: username, username, password: hashed }
-    await this.col.insertOne({
-      _id: username,
-      username,
-      password: hashed,
-    });
-
-    return true;
-  }
-
+      async registerUser(username: string, plaintextPassword: string): Promise<boolean> {
+        // 1) check for existing
+        const existing = await this.credsCol.findOne({ _id: username });
+        if (existing) return false;
+    
+        // 2) hash
+        const salt = await bcrypt.genSalt(10);
+        const hashed = await bcrypt.hash(plaintextPassword, salt);
+    
+        // 3) insert credentials
+        await this.credsCol.insertOne({
+          _id: username,
+          username,
+          password: hashed,
+        });
+    
+        // 4) ALSO insert into users collection
+        await this.usersCol.insertOne({
+          _id: username,
+          username,
+          email: `${username}@example.com`,
+        });
+    
+        return true;
+      }
   /**
    * Returns true if that username exists AND the plaintext password matches
    * the stored bcrypt hash. Otherwise false.
    */
   async verifyUser(username: string, password: string): Promise<boolean> {
-    // 1) Look up the stored document
-    const record = await this.col.findOne({ _id: username });
+    // 1) Look up the stored credentials document
+    const record = await this.credsCol.findOne({ _id: username });
     if (!record) {
-      return false; // no such user
+      // user not found
+      return false;
     }
 
-    // 2) Compare the plaintext `password` against record.password (bcrypt hash)
+    // 2) Compare the plaintext password against the stored bcrypt hash
     const isMatch = await bcrypt.compare(password, record.password);
     return isMatch;
   }

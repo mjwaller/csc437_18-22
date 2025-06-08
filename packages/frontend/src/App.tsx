@@ -1,25 +1,54 @@
 // src/App.tsx
-import { useState } from "react";
-import { Routes, Route } from "react-router-dom"; // <-- from react-router-dom
+import { useState } from "react"
+import { Routes, Route, useNavigate } from "react-router-dom"
 
-import { MainLayout } from "./MainLayout";
-import { AllImages } from "./images/AllImages";
-import { ImageDetails } from "./images/ImageDetails";
-import { LoginPage } from "./LoginPage";
-import { ProtectedRoute } from "./ProtectedRoute";
+import { MainLayout } from "./MainLayout"
+import { AllImages }   from "./images/AllImages"
+import { ImageDetails } from "./images/ImageDetails"
+import { LoginPage }   from "./LoginPage"
+import { ProtectedRoute } from "./ProtectedRoute"
+import { UploadPage }    from "./UploadPage"
+import { ImageSearchForm } from "./images/ImageSearchForm";
 
-import type { IApiImageData } from "csc437-monorepo-backend/src/common/ApiImageData";
-import { UploadPage } from "./UploadPage";
+import type { IApiImageData } from "csc437-monorepo-backend/src/common/ApiImageData"
 
 export default function App() {
-  const [images, setImages] = useState<IApiImageData[]>([]);
-  const [isLoading] = useState(true);
-  const [hasError] = useState(false);
-  const [authToken, setAuthToken] = useState<string | null>(null);
+  const [searchString, setSearchString] = useState("");
+  const [images,   setImages]   = useState<IApiImageData[]>([])
+  const [isLoading, setLoading] = useState(false)
+  const [hasError, setError]    = useState(false)
+  const [authToken, setAuthToken] = useState<string | null>(null)
+  const navigate = useNavigate();
+
+  async function fetchImages(token: string, search?: string) {
+    setLoading(true);
+    setError(false);
+    try {
+      const url = search
+        ? `/api/images?search=${encodeURIComponent(search)}`
+        : "/api/images";
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(`Status ${res.status}`);
+      setImages(await res.json());
+    } catch (err) {
+      console.error(err);
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   function handleLoginSuccess(token: string) {
-    setAuthToken(token);
-    // …later, trigger fetch("/api/images") with Authorization header…
+    setAuthToken(token)
+    fetchImages(token)
+    navigate("/", { replace: true });
+  }
+
+  function handleSearchRequested() {
+    if (!authToken) return;
+    fetchImages(authToken, searchString);
   }
 
   return (
@@ -52,6 +81,13 @@ export default function App() {
                 images={images}
                 isLoading={isLoading}
                 hasError={hasError}
+                searchPanel={
+                  <ImageSearchForm
+                    searchString={searchString}
+                    onSearchStringChange={setSearchString}
+                    onSearchRequested={handleSearchRequested}
+                  />
+                }
               />
             </ProtectedRoute>
           }
@@ -64,18 +100,26 @@ export default function App() {
                 images={images}
                 isLoading={isLoading}
                 hasError={hasError}
-                onNameSaved={(id, newName) => {
-                  setImages((prev) =>
-                    prev.map((img) =>
-                      img._id === id ? { ...img, name: newName } : img
+                onNameSaved={(id, newName) =>
+                  setImages(imgs =>
+                    imgs.map(img =>
+                      (img._id === id ? { ...img, name: newName } : img)
                     )
-                  );
-                }}
+                  )
+                }
               />
             </ProtectedRoute>
           }
         />
-
+        <Route
+          path="/upload"
+          element={
+            <ProtectedRoute authToken={authToken}>
+              <UploadPage authToken={authToken!} />
+            </ProtectedRoute>
+          }
+        />
+        {/* catch-all → login */}
         <Route
           path="*"
           element={
@@ -85,16 +129,7 @@ export default function App() {
             />
           }
         />
-
-        <Route
-          path="/upload"
-          element={
-            <ProtectedRoute authToken={authToken}>
-              <UploadPage authToken={authToken!} />
-            </ProtectedRoute>
-          }
-          />
       </Route>
     </Routes>
-  );
+  )
 }
