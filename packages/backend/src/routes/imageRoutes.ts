@@ -3,7 +3,6 @@ import { ImageProvider } from "../ImageProvider";
 import { imageMiddlewareFactory, handleImageFileErrors } from "../middleware/imageUploadMiddleware";
 
 export function registerImageRoutes(app: express.Application, imageProvider: ImageProvider) {
-  console.log("🖼️ Mounting image routes");
 
   const router = express.Router();
 

@@ -9,7 +9,7 @@ interface IImageDocument {
 }
 
 interface IUserDocument {
-  _id:      string;   // note: your users collection uses a string _id
+  _id:      string;
   username: string;
 }
 
@@ -53,8 +53,7 @@ export class ImageProvider {
       { $unwind: "$authorArr" },
       {
         $project: {
-          _id:    0,                          // drop the original BSON _id
-          id:     { $toString: "$_id" },     // new string id
+          _id:    { $toString: "$_id" },
           src:    1,
           name:   1,
           author: {
@@ -66,11 +65,6 @@ export class ImageProvider {
     );
 
     return this.imagesCol.aggregate<IApiImageData>(pipeline).toArray();
-  }
-
-  /** Alias for getAllImages, matching earlier naming */
-  getImages(searchTerm?: string) {
-    return this.getAllImages(searchTerm);
   }
 
   /** Update an image’s name by its string `id` */
